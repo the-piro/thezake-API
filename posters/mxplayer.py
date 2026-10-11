@@ -3,9 +3,9 @@ from datetime import datetime
 from urllib.parse import urlparse
 
 from curl_cffi import requests
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query
 
-app = FastAPI()
+router = APIRouter()
 
 API_URL = "https://api.mxplayer.in/v1/web/detail/video"
 BASE_URL = "https://www.mxplayer.in"
@@ -54,8 +54,10 @@ def mxplayer(url: str):
     def image_url(path):
         if not path:
             return None
+
         if path.startswith(("http://", "https://")):
             return path
+
         return "https://qqcdnpictest.mxplay.com/" + path.lstrip("/")
 
     def get_image(items, image_type):
@@ -72,7 +74,10 @@ def mxplayer(url: str):
             person_role = (person.get("role") or "").lower()
 
             if role == "directors":
-                matched = "director" in person_type or "director" in person_role
+                matched = (
+                    "director" in person_type
+                    or "director" in person_role
+                )
             else:
                 matched = person_type == "actor" or person_role == "actor"
 
@@ -82,7 +87,10 @@ def mxplayer(url: str):
                     "type": person.get("type"),
                     "role": person.get("role"),
                     "id": person.get("id"),
-                    "image": get_image(person.get("imageInfo"), "square"),
+                    "image": get_image(
+                        person.get("imageInfo"),
+                        "square",
+                    ),
                 })
 
         return result
@@ -94,28 +102,24 @@ def mxplayer(url: str):
 
     landscape = get_image(image_info, "bigpic")
     portrait = get_image(image_info, "portrait")
+    cover = get_image(
+        title_images,
+        "banner_and_static_bg_desktop",
+    )
     logo = get_image(title_images, "title_desktop")
-    cover = get_image(title_images, "banner_and_static_bg_desktop")
 
-    if not landscape and images.get("16x9"):
-        landscape = image_url(images["16x9"])
+    if not landscape:
+        landscape = image_url(images.get("16x9"))
 
-    if not portrait and images.get("2x3"):
-        portrait = image_url(images["2x3"])
+    if not portrait:
+        portrait = image_url(images.get("2x3"))
 
     preview_info = data.get("gifVideoUrlInfo") or []
     preview = {
-        "landscape": image_url(
-            next(
-                (
-                    item.get("url")
-                    for item in preview_info
-                    if item.get("type") == "bigpic"
-                ),
-                None,
-            )
+        "landscape": get_image(preview_info, "bigpic"),
+        "portrait": image_url(
+            (data.get("gifVideoUrl") or {}).get("2x3")
         ),
-        "portrait": image_url((data.get("gifVideoUrl") or {}).get("2x3")),
     }
 
     languages = [
@@ -136,9 +140,8 @@ def mxplayer(url: str):
         if item.get("name")
     ]
 
-    seek_thumbnail = []
-    for item in data.get("seekThumbnail") or []:
-        seek_thumbnail.append({
+    seek_thumbnails = [
+        {
             "url": image_url(item.get("url")),
             "total": item.get("total"),
             "width": item.get("width"),
@@ -146,9 +149,12 @@ def mxplayer(url: str):
             "interval": item.get("interval"),
             "columns": item.get("column"),
             "rows": item.get("row"),
-        })
+        }
+        for item in data.get("seekThumbnail") or []
+    ]
 
     release_date = data.get("releaseDate")
+
     if release_date:
         try:
             release_date = datetime.fromisoformat(
@@ -179,7 +185,7 @@ def mxplayer(url: str):
         },
         "preview": preview,
         "tags": tags,
-        "seek_thumbnails": seek_thumbnail,
+        "seek_thumbnails": seek_thumbnails,
         "url": (
             BASE_URL + web_url
             if web_url and web_url.startswith("/")
@@ -188,13 +194,22 @@ def mxplayer(url: str):
     }
 
 
-@app.get("/mxplayer")
+@router.get("/mxplayer")
 def mxplayer_endpoint(url: str = Query(...)):
     try:
         return mxplayer(url)
-    except requests.errors.RequestsError as e:
-        raise HTTPException(status_code=502, detail=f"MX Player API error: {e}")
+
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+    except requests.errors.RequestsError as e:
+        raise HTTPException(
+            status_code=502,
+            detail=f"MX Player API error: {e}",
+        )
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail=str(e),
+    )
