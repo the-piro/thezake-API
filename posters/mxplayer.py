@@ -115,43 +115,13 @@ def mxplayer(url: str):
         portrait = image_url(images.get("2x3"))
 
     preview_info = data.get("gifVideoUrlInfo") or []
+
     preview = {
         "landscape": get_image(preview_info, "bigpic"),
         "portrait": image_url(
             (data.get("gifVideoUrl") or {}).get("2x3")
         ),
     }
-
-    languages = [
-        item.get("name")
-        for item in data.get("languagesDetails") or []
-        if item.get("name")
-    ]
-
-    genres = [
-        item.get("name")
-        for item in data.get("genresDetails") or []
-        if item.get("name")
-    ]
-
-    tags = [
-        item.get("name")
-        for item in data.get("tags") or []
-        if item.get("name")
-    ]
-
-    seek_thumbnails = [
-        {
-            "url": image_url(item.get("url")),
-            "total": item.get("total"),
-            "width": item.get("width"),
-            "height": item.get("height"),
-            "interval": item.get("interval"),
-            "columns": item.get("column"),
-            "rows": item.get("row"),
-        }
-        for item in data.get("seekThumbnail") or []
-    ]
 
     release_date = data.get("releaseDate")
 
@@ -166,17 +136,7 @@ def mxplayer(url: str):
     web_url = data.get("webUrl")
 
     return {
-        "id": data.get("id"),
-        "type": data.get("type"),
         "title": data.get("title"),
-        "description": data.get("description"),
-        "release_date": release_date,
-        "duration": data.get("duration"),
-        "language": languages,
-        "genres": genres,
-        "cast": get_contributors("cast"),
-        "directors": get_contributors("directors"),
-        "publisher": publisher.get("name"),
         "images": {
             "landscape": landscape,
             "portrait": portrait,
@@ -184,8 +144,41 @@ def mxplayer(url: str):
             "logo": logo,
         },
         "preview": preview,
-        "tags": tags,
-        "seek_thumbnails": seek_thumbnails,
+        "description": data.get("description"),
+        "release_date": release_date,
+        "duration": data.get("duration"),
+        "id": data.get("id"),
+        "type": data.get("type"),
+        "language": [
+            item.get("name")
+            for item in data.get("languagesDetails") or []
+            if item.get("name")
+        ],
+        "genres": [
+            item.get("name")
+            for item in data.get("genresDetails") or []
+            if item.get("name")
+        ],
+        "cast": get_contributors("cast"),
+        "directors": get_contributors("directors"),
+        "publisher": publisher.get("name"),
+        "tags": [
+            item.get("name")
+            for item in data.get("tags") or []
+            if item.get("name")
+        ],
+        "seek_thumbnails": [
+            {
+                "url": image_url(item.get("url")),
+                "total": item.get("total"),
+                "width": item.get("width"),
+                "height": item.get("height"),
+                "interval": item.get("interval"),
+                "columns": item.get("column"),
+                "rows": item.get("row"),
+            }
+            for item in data.get("seekThumbnail") or []
+        ],
         "url": (
             BASE_URL + web_url
             if web_url and web_url.startswith("/")
@@ -212,4 +205,4 @@ def mxplayer_endpoint(url: str = Query(...)):
         raise HTTPException(
             status_code=500,
             detail=str(e),
-    )
+        )
